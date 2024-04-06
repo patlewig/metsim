@@ -10,7 +10,9 @@ import datetime
 import requests
 import pprint
 import json
-from metsim.utl.hcd import metsim_hcd_out
+import time
+
+from metsim.utl.hcd import metsim_hcd_out, metsim_metadata_full
 
 
 def metsim_run_toolbox_api(host_name = None, tb_port = None,
@@ -20,99 +22,116 @@ def metsim_run_toolbox_api(host_name = None, tb_port = None,
                        dtxsid = None,
                        chem_name = None,
                        idx = None):
-    import datetime
-    import time
-    import pandas as pd
-    import urllib.request, urllib.parse, json
-    #simulator num is 15 for in vitro and 8 for in vivo
-    metsim_url_base = f"""http://{host_name}:{tb_port}/api/v6/Metabolism/"""
-    with urllib.request.urlopen(metsim_url_base) as url:
-        oecd_metsim_guids = json.loads(url.read().decode())
-    #store GUID of metabolism simulator
-    guid = oecd_metsim_guids[simulator_num]['Guid']
-    #Store base metsim info in output dictionary:
-    oecd_dict = {'datetime': str(datetime.datetime.now().strftime('%Y-%m-%d_%Hh%Mm%Ss')),
-                 'software': 'OECD QSAR Toolbox WebAPI',
-                 'version': 6,
-                 'params':{'depth': 3,
-                           'organism': 'Rat',
-                           'site_of_metabolism': False,
-                           'model': [oecd_metsim_guids[simulator_num]['Caption']]
-                          }
-                }
+	"""
+	Runs a metabolism simulator of choice via an existing running instance of the OECD QSAR Toolbox Server Web API. 
+	Returns the hierarchically structured MetSim dictionary output of predicted metabolites.
+	    
+	inputs:
+	host_name (str, required): "localhost" if running a local instance of the toolbox server.
+	tb_port (int, required): integer corresponding to the port number that was set when the toolbox server was started up (e.g., 9999).
+	simulator_num (int, required): integer between 0-16 corresponding to the index of the simulator GUID list that dictates which metabolism simulator to use.
+		                           use 8 for In Vivo Rat Simulator or 15 for In Vitro Rat Liver S9. All other models are given in the Swagger UI for the API at 
+		                           http://localhost:tb_port/Swagger
+	smiles (str, required): SMILES for the parent chemical of interest
+	casrn (str, optional): Chemical Abstract Services Registry Number (CASRN) for the parent chemical of interest
+	dtxsid (str, optional): Distributed Structure Searchable Toxicity (DSSTox) Database Identifier (DTXSID) for the parent chemical of interest
+	chem_name (str, optional): Preferred chemical name for the parent chemical of interest
+	idx (int, optional): Dummy index for use with "multiprocess" when parallel processing this function.
+	    
+	output:
+	tuple of (idx, oecd_dict), where oecd_dict is a dictionary of hierarchically structured, metsim predicted precursor-successor relationships for the parent input chemical 
+	    
+	"""
+   
+	#simulator num is 15 for in vitro and 8 for in vivo
+	metsim_url_base = f"""http://{host_name}:{tb_port}/api/v6/Metabolism/"""
+	with urllib.request.urlopen(metsim_url_base) as url:
+            oecd_metsim_guids = json.loads(url.read().decode())
+	#store GUID of metabolism simulator
+	guid = oecd_metsim_guids[simulator_num]['Guid']
+	#Store base metsim info in output dictionary:
+	oecd_dict = {'datetime': str(datetime.datetime.now().strftime('%Y-%m-%d_%Hh%Mm%Ss')),
+		         'software': 'OECD QSAR Toolbox WebAPI',
+		         'version': 6,
+		         'params':{'depth': 3,
+		                   'organism': 'Rat',
+		                   'site_of_metabolism': False,
+		                   'model': [oecd_metsim_guids[simulator_num]['Caption']]
+		                  }
+		        }
 
-    #make lambda function to perform metsim in API:
-    metsim_exec = lambda url: json.loads(urllib.request.urlopen(url).read().decode())
-    #Lambda function to search with url-encoded SMILES:
-    search_base = f"""http://{host_name}:{tb_port}/api/v6/Search/"""
-    search_smiles = lambda smiles: json.loads(urllib.request.urlopen(search_base+'smiles/false/true?smiles='+smiles).read().decode())
-    #Lambda function to search on casrn if qsar_ready_smiles = nan:
-    search_cas = lambda casrn: json.loads(urllib.request.urlopen(search_base+'cas/'+casrn+'/true').read().decode())
-    stereo_filter = ['@','/','\\','.']
-    oecd_dict['input'] = {'smiles': smiles,
-                          'inchikey': None,
-                          'casrn': casrn,
-                          'hcd_smiles': None,
-                          'dtxsid': dtxsid,
-                          'chem_name': chem_name
-                         }
-    oecd_metab_list = []
-    if pd.notna(smiles):
-        #url encode SMILES
-        smiles_encoded = urllib.parse.quote_plus(smiles)
-        #Try metsim with base SMILES call first before doing anything more complicated than that:
-        if pd.notna(smiles_encoded):
-            print('Attempting metsim from SMILES input for index #'+str(idx)+'...')
-            metsim_url = metsim_url_base+guid+'?smiles='+smiles_encoded  
-            oecd_metab_list = metsim_exec(metsim_url) #store metabolite list for the input precursor
-        if len(oecd_metab_list) > 0:
-            oecd_dict['output'] = []
-            oecd_dict['output'].append({'precursor': oecd_dict['input'],
-                                        'successors': [{'enzyme': None,
-                                                        'mechanism': None,
-                                                        'metabolite': {'smiles': oecd_metab_list[j],
-                                                                       'inchikey': None,
-                                                                       'casrn': None,
-                                                                       'hcd_smiles': None,
-                                                                       'dtxsid': None,
-                                                                       'chem_name': None
-                                                                      },
-                                                       } for j in range(len(oecd_metab_list))]
-                                      })
-            print('metsim succeeded for index #'+str(idx))
-        else:
-            oecd_dict = idx
-    elif pd.notna(casrn) & ('NOCAS' not in casrn):
-        oecd_dict = idx
-    else:
-        #This dictionary returns if no SMILES or CASRN are given:
-        oecd_dict['input'] = {'smiles': None,
-                              'inchikey': None,
-                              'casrn': None,
-                              'hcd_smiles': None,
-                              'dtxsid': None,
-                              'chem_name': None
-                             }
-        oecd_dict['output'] = [{'precursor': {'smiles': None,
-                                              'inchikey': None,
-                                              'casrn': None,
-                                              'hcd_smiles': None,
-                                              'dtxsid': None,
-                                              'chem_name': None
-                                             },
-                                'successors': [{'enzyme': [],
-                                                'mechanism': None,
-                                                'metabolite': {'smiles': None,
-                                                               'inchikey': None,
-                                                               'casrn': None,
-                                                               'hcd_smiles': None,
-                                                               'dtxsid': None,
-                                                               'chem_name': None
-                                                               }
-                                              }]
-                              }]
-        print('metsim failed for index #'+str(idx)+'. Neither SMILES nor CASRN were provided.')
-    return (idx, oecd_dict)
+	#make lambda function to perform metsim in API:
+	metsim_exec = lambda url: json.loads(urllib.request.urlopen(url).read().decode())
+	#Lambda function to search with url-encoded SMILES:
+	search_base = f"""http://{host_name}:{tb_port}/api/v6/Search/"""
+	search_smiles = lambda smiles: json.loads(urllib.request.urlopen(search_base+'smiles/false/true?smiles='+smiles).read().decode())
+	#Lambda function to search on casrn if qsar_ready_smiles = nan:
+	search_cas = lambda casrn: json.loads(urllib.request.urlopen(search_base+'cas/'+casrn+'/true').read().decode())
+	stereo_filter = ['@','/','\\','.']
+	oecd_dict['input'] = {'smiles': smiles,
+		                  'inchikey': None,
+		                  'casrn': casrn,
+		                  'hcd_smiles': None,
+		                  'dtxsid': dtxsid,
+		                  'chem_name': chem_name
+		                 }
+	oecd_metab_list = []
+	if pd.notna(smiles):
+		#url encode SMILES
+		smiles_encoded = urllib.parse.quote_plus(smiles)
+		#Try metsim with base SMILES call first before doing anything more complicated than that:
+		if pd.notna(smiles_encoded):
+		    print('Attempting metsim from SMILES input for index #'+str(idx)+'...')
+		    metsim_url = metsim_url_base+guid+'?smiles='+smiles_encoded  
+		    oecd_metab_list = metsim_exec(metsim_url) #store metabolite list for the input precursor
+		if len(oecd_metab_list) > 0:
+		    oecd_dict['output'] = []
+		    oecd_dict['output'].append({'precursor': oecd_dict['input'],
+		                                'successors': [{'enzyme': None,
+		                                                'mechanism': None,
+		                                                'metabolite': {'smiles': oecd_metab_list[j],
+		                                                               'inchikey': None,
+		                                                               'casrn': None,
+		                                                               'hcd_smiles': None,
+		                                                               'dtxsid': None,
+		                                                               'chem_name': None
+		                                                              },
+		                                               } for j in range(len(oecd_metab_list))]
+		                              })
+		    print('metsim succeeded for index #'+str(idx))
+		else:
+		    oecd_dict = idx
+	elif pd.notna(casrn) & ('NOCAS' not in casrn):
+		oecd_dict = idx
+	else:
+		#This dictionary returns if no SMILES or CASRN are given:
+		oecd_dict['input'] = {'smiles': None,
+		                      'inchikey': None,
+		                      'casrn': None,
+		                      'hcd_smiles': None,
+		                      'dtxsid': None,
+		                      'chem_name': None
+		                     }
+		oecd_dict['output'] = [{'precursor': {'smiles': None,
+		                                      'inchikey': None,
+		                                      'casrn': None,
+		                                      'hcd_smiles': None,
+		                                      'dtxsid': None,
+		                                      'chem_name': None
+		                                     },
+		                        'successors': [{'enzyme': [],
+		                                        'mechanism': None,
+		                                        'metabolite': {'smiles': None,
+		                                                       'inchikey': None,
+		                                                       'casrn': None,
+		                                                       'hcd_smiles': None,
+		                                                       'dtxsid': None,
+		                                                       'chem_name': None
+		                                                       }
+		                                      }]
+		                      }]
+		print('metsim failed for index #'+str(idx)+'. Neither SMILES nor CASRN were provided.')
+	return (idx, oecd_dict)
 
 
 
@@ -128,12 +147,12 @@ def metsim_tb_search_logkow(casrn = None, host_name = None, tb_port = None, idx 
     Inputs: 
     casrn: CAS Registry Number
     tb_port: Port number selected for locally running instance of the Toolbox Server
+    host_name: ip address for the server runnning the Toolbox
     
     Outputs:
     log_kow: Log10 scaled octanol-water partition coefficient, if available.
     """
-    import pandas as pd
-    import urllib.request, urllib.parse, json
+   
     
     search_base = f"""http://{host_name}:{tb_port}/api/v6/search/"""
     kow_url = f"""http://{host_name}:{tb_port}/api/v6/calculation/41552380-4d5d-4eab-bee0-03774c0eabb6/"""
@@ -200,16 +219,40 @@ def metsim_search_toolbox_api(tb_port = 16384,
                               dtxsid = None,
                               chem_name = None,
                               idx = None):
+    """
+    Version of metsim_run_toolbox_api that does not perform the SMILES metsim query, but searches for alternate Toolbox database ChemIds using CASRN, 
+    and the resulting SMILES for any obtained ChemIDs to perform simulation via the same procedure as metsim_run_toolbox_api.
+    
+    Run serially to circumvent toolbox search server crash issues until rectified by LMC service pack updates.
+    
+    inputs:
+    host_name (str, required): "localhost" if running a local instance of the toolbox server.
+    tb_port (int, required): integer corresponding to the port number that was set when the toolbox server was started up (e.g., 9999).
+    simulator_num (int, required): integer between 0-16 corresponding to the index of the simulator GUID list that dictates which metabolism simulator to use.
+                                   use 8 for In Vivo Rat Simulator or 15 for In Vitro Rat Liver S9. All other models are given in the Swagger UI for the API at 
+                                   http://localhost:tb_port/Swagger
+    smiles (str, required): SMILES for the parent chemical of interest
+    casrn (str, optional): Chemical Abstract Services Registry Number (CASRN) for the parent chemical of interest
+    dtxsid (str, optional): Distributed Structure Searchable Toxicity (DSSTox) Database Identifier (DTXSID) for the parent chemical of interest
+    chem_name (str, optional): Preferred chemical name for the parent chemical of interest
+    idx (int, optional): Dummy index for use with "multiprocess" when parallel processing this function.
+    
+    output:
+    tuple of (idx, oecd_dict), where oecd_dict is a dictionary of hierarchically structured, metsim predicted precursor-successor relationships for the parent input chemical 
+    
+    """
+    
+    
+    
+    
     #Version of toolbox_metsim_api that does not do the SMILES metsim query, but searches for ChemIds on SMILES and CASRN to do metsim.
     #Run serially to circumvent TB search server crash issues until rectified by LMC updates.
-    import datetime
-    import time
-    import pandas as pd
-    import urllib.request, urllib.parse, json
+   
     
     metsim_url_base = f"""http://{host_name}:{tb_port}/api/v6/Metabolism/"""
+    
     with urllib.request.urlopen(metsim_url_base) as url:
-        oecd_metsim_guids = json.loads(url.read().decode())
+            oecd_metsim_guids = json.loads(url.read().decode())
     #store GUID of metabolism simulator
     guid = oecd_metsim_guids[simulator_num]['Guid']
     #Store base metsim info in output dictionary:

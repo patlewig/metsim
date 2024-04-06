@@ -11,6 +11,26 @@ from metsim.utl.hcd import metsim_hcd_out
 def metsim_run_times(times_df = None,
                      model = 'vitro'):
     
+    """
+    Takes the metabolism report loaded as a pandas dataframe from the CSV output from the TIMES Desktop Application for a given simulator and returns the metsim hierarchy
+    with all available metadata from EPA Cheminformatics Modules API for all precursor-successor relationships predicted from either the In Vivo Rat Simulator 
+    or the In Vitro Rat Liver S9 model within times. 
+    
+    How to get the CSV required:
+    In the tab named after the simulator in the TIMES GUI, generate the metabolism "Map" from the "Reports" toolbar after running the simulator on all parent chemicals,
+    The "Map Report" table that is produced can be copied to the clipboard, pasted into spreadsheet software, and saved as a CSV file. Load this as a dataframe via Pandas.
+    
+    Inputs:
+    times_df (dataframe, required): Dataframe of metabolism output from TIMES
+    model (str, optional): Specify either In Vitro Rat Liver S9 with "vitro" (default), or In Vivo Rat Simulator with "vivo".
+    
+    Output:
+    times_metsim_dict (list of dict): Generationally tracked, MetSim hierarchy structured dictionary of precursor-successor relationships for all available input chemicals 
+    """
+    
+    
+    
+    
     if times_df.empty == False:
         precursor_df = times_df.loc[pd.notna(times_df['Chemical name']),:]
         precursor_df = precursor_df.drop_duplicates(subset='Chemical name', ignore_index=True)

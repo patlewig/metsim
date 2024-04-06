@@ -17,7 +17,7 @@ def metsim_hcd_out(smiles = None,
                    likely = None):
     """
     Query function for the Cheminformatics Modules Standardizer API, formerly wrapped within the Hazard Comparison Dashboard (HCD) API. 
-    Used to convert an input SMILES string into QSAR-Ready SMILES. Returns InChIKey structural identifier as well,
+    Used to convert an input SMILES string into QSAR-Ready SMILES (hcd_smiles). Returns InChIKey structural identifier as well,
     along with any other chemical identifer metadata if available, and not already given as inputs (e.g., CASRN, DTXSID, Chemical Name).
     
     If SMILES is not known, but DTXSID is known, can instead query on DTXSID to obtain Daylight SMILES from the Comptox Chemicals Dashboard API (CCD API),
@@ -36,7 +36,7 @@ def metsim_hcd_out(smiles = None,
     
     Returns:
     out_dict: Output dictionary containing all available output data for the given chemical, using the input parameter names as dictionary keys.
-    Includes "hcd_smiles" as output dictionary key containing QSAR-Ready version of the input SMILES.
+    Includes "hcd" as output dictionary key containing QSAR-Ready version of the input SMILES.
     
     Examples:
     
@@ -208,3 +208,96 @@ def metsim_hcd_out(smiles = None,
                     'likelihood': likely
                    }
     return out_dict
+
+def metsim_metadata_full(metsim_out = [], fnam = None, metsim_cache = None):
+    """
+    MetSim simulators return a hierarchically structured dictionary of predicted precursor and successor SMILES from the given input SMILES. This function
+    Takes a completed dataset of MetSim predictions in list format, iteratively queries EPA Cheminformatics Modules Standardizer API via the single metsim_hcd_out
+    utility function call for all precursors and successors in the metsim hierarchy, and returns the list with all available metadata for all the predicted precursors and metabolites.
+    (i.e., each parent input smiles produces its own dictionary, start from the list of those dictionaries for a full dataset of input parent chemicals).
+    
+    incorporates temporary caching of the metsim_hcd_out queries to avoid repepetive queries for commonly reoccuring metabolites to save time.
+    
+    Input:
+    
+    metsim_out (list): list of MetSim hierarchically structured dictionary outputs for each input chemical in the dataset.
+    fnam (str, optional): the filename you would like to save the output to, ending in .json (e.g., "my_output_data.json"), will save to current working directory if not otherwise specified in fnam.
+    metsim_cache (list, optional): list of cached metsim_hcd_out queries.
+    """
+    if len(metsim_out) > 0:
+        if type(metsim_out) == dict:
+            metsim_out = [metsim_out] #if a single chemical dataset is given, convert to list of dict
+        if metsim_cache != None:
+            #Supplement metadata via serial HCD query through individual input chemicals, precursors, successors/metabolites for a full metsim dataset
+            for i in range(len(metsim_out)): # i = number of input chemicals
+                if metsim_out[i]['input']['inchikey'] != None:
+                        continue
+                if metsim_out[i]['input']['smiles'] not in [cache_item['smiles'] for cache_item in metsim_cache]:
+                    metsim_out[i]['input'] = metsim_hcd_out(smiles = metsim_out[i]['input']['smiles'],
+                                                            casrn = metsim_out[i]['input']['casrn'],
+                                                            dtxsid = metsim_out[i]['input']['dtxsid'],
+                                                            chem_name = metsim_out[i]['input']['chem_name'])
+                    metsim_cache.append(metsim_out[i]['input'])
+                    print('Input query added to metadata cache...')
+                else:
+                    print('Input SMILES found in cached results. Inserting into dictionary...')
+                    metsim_out[i]['input'] = metsim_cache[[idx for idx in range(len(metsim_cache)) if metsim_cache[idx]['smiles'] == metsim_out[i]['input']['smiles']][0]]
+                for j in range(len(metsim_out[i]['output'])): # j = number of unique precursors
+                    if 'likelihood' in list(metsim_out[i]['output'][j]['precursor'].keys()):
+                        if metsim_out[i]['output'][j]['precursor']['smiles'] not in [cache_item['smiles'] for cache_item in metsim_cache]:
+                            metsim_out[i]['output'][j]['precursor'] = metsim_hcd_out(smiles = metsim_out[i]['output'][j]['precursor']['smiles'],
+                                                                                     casrn = metsim_out[i]['output'][j]['precursor']['casrn'],
+                                                                                     dtxsid = metsim_out[i]['output'][j]['precursor']['dtxsid'],
+                                                                                     chem_name = metsim_out[i]['output'][j]['precursor']['chem_name'],
+                                                                                     likely = metsim_out[i]['output'][j]['precursor']['likelihood'])
+                            metsim_cache.append(metsim_out[i]['output'][j]['precursor'])
+                            print('Precursor query added to metadata cache...')
+                        else:
+                            print('Precursor SMILES found in cached results. Inserting into dictionary...')
+                            metsim_out[i]['output'][j]['precursor'] = metsim_cache[[idx for idx in range(len(metsim_cache)) if metsim_cache[idx]['smiles'] == metsim_out[i]['output'][j]['precursor']['smiles']][0]]
+                    else:
+                        if metsim_out[i]['output'][j]['precursor']['smiles'] not in [cache_item['smiles'] for cache_item in metsim_cache]:
+                            metsim_out[i]['output'][j]['precursor'] = metsim_hcd_out(smiles = metsim_out[i]['output'][j]['precursor']['smiles'],
+                                                                                     casrn = metsim_out[i]['output'][j]['precursor']['casrn'],
+                                                                                     dtxsid = metsim_out[i]['output'][j]['precursor']['dtxsid'],
+                                                                                     chem_name = metsim_out[i]['output'][j]['precursor']['chem_name'])
+                            metsim_cache.append(metsim_out[i]['output'][j]['precursor'])
+                            print('Precursor query added to metadata cache...')
+                        else:
+                            print('Precursor SMILES found in cached results. Inserting into dictionary...')
+                            metsim_out[i]['output'][j]['precursor'] = metsim_cache[[idx for idx in range(len(metsim_cache)) if metsim_cache[idx]['smiles'] == metsim_out[i]['output'][j]['precursor']['smiles']][0]]
+                    for k in range(len(metsim_out[i]['output'][j]['successors'])): # k = number of metabolites per precursor
+                        if 'likelihood' in list(metsim_out[i]['output'][j]['successors'][k]['metabolite'].keys()):
+                            if metsim_out[i]['output'][j]['successors'][k]['metabolite']['smiles'] not in [cache_item['smiles'] for cache_item in metsim_cache]:
+                                metsim_out[i]['output'][j]['successors'][k]['metabolite'] = metsim_hcd_out(smiles = metsim_out[i]['output'][j]['successors'][k]['metabolite']['smiles'],
+                                                                                                           casrn = metsim_out[i]['output'][j]['successors'][k]['metabolite']['casrn'],
+                                                                                                           dtxsid = metsim_out[i]['output'][j]['successors'][k]['metabolite']['dtxsid'],
+                                                                                                           chem_name = metsim_out[i]['output'][j]['successors'][k]['metabolite']['chem_name'],
+                                                                                                           likely = metsim_out[i]['output'][j]['successors'][k]['metabolite']['likelihood'])
+                                metsim_cache.append(metsim_out[i]['output'][j]['successors'][k]['metabolite'])
+                                print('Successor metabolite query added to metadata cache...')
+                            else:
+                                print('Successor metabolite SMILES found in cached results. Inserting into dictionary...')
+                                metsim_out[i]['output'][j]['successors'][k]['metabolite'] = metsim_cache[[idx for idx in range(len(metsim_cache)) if metsim_cache[idx]['smiles'] == metsim_out[i]['output'][j]['successors'][k]['metabolite']['smiles']][0]] 
+                        else:
+                            if metsim_out[i]['output'][j]['successors'][k]['metabolite']['smiles'] not in [cache_item['smiles'] for cache_item in metsim_cache]:
+                                metsim_out[i]['output'][j]['successors'][k]['metabolite'] = metsim_hcd_out(smiles = metsim_out[i]['output'][j]['successors'][k]['metabolite']['smiles'],
+                                                                                                           casrn = metsim_out[i]['output'][j]['successors'][k]['metabolite']['casrn'],
+                                                                                                           dtxsid = metsim_out[i]['output'][j]['successors'][k]['metabolite']['dtxsid'],
+                                                                                                           chem_name = metsim_out[i]['output'][j]['successors'][k]['metabolite']['chem_name'])
+                                metsim_cache.append(metsim_out[i]['output'][j]['successors'][k]['metabolite'])
+                                print('Successor metabolite query added to metadata cache...')
+                            else:
+                                print('Successor metabolite SMILES found in cached results. Inserting into dictionary...')
+                                metsim_out[i]['output'][j]['successors'][k]['metabolite'] = metsim_cache[[idx for idx in range(len(metsim_cache)) if metsim_cache[idx]['smiles'] == metsim_out[i]['output'][j]['successors'][k]['metabolite']['smiles']][0]] 
+                        print('input: '+str(i+1)+'/'+str(len(metsim_out))+' precursor: '+str(j+1)+'/'+str(len(metsim_out[i]['output']))+' metabolite: '+str(k+1)+'/'+str(len(metsim_out[i]['output'][j]['successors'])))
+                if fnam != None:
+                    json.dump(metsim_out, open(fnam,'w'))
+                else:
+                    json.dump(metsim_out, open(str(datetime.datetime.now().strftime('%Y-%m-%d'))+'_metsim_metadata_full.json','w'))
+        else:
+            return metsim_metadata_full(metsim_out = metsim_out, fnam = fnam, metsim_cache = [])
+    else:
+        raise('Please supply a metsim dataset (list of dictionaries)')
+    # print(metsim_out)
+    return metsim_out    

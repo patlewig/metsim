@@ -6,12 +6,16 @@ from rdkit import Chem
 import datetime
 import pprint
 import json
-from metsim.utl.hcd import metsim_hcd_out
+from metsim.utl.hcd import metsim_hcd_out,  metsim_metadata_full
 
-def metsim_run_cts(smiles = None, gens = 0):
+def metsim_cts_query(smiles = None, gens = 0):
     """
-    Using CTS ChemAxon Human Phase I metabolism via its REST API
-    takes an input SMILES string that will serve as the value for the "structure" key in the POST JSON dict and an integer value for number of metabolism cycles (0-4)
+    Helper function to query the REST API for EPA CTS ChemAxon Human Phase I metabolic simulator.
+    
+    Input:
+    smiles (str, required): parent/precursor SMILES string that will serve as the value for the "structure" key in the POST JSON for the API request.
+    gens (int, required): An integer value for number of metabolism cycles/generations (0-4)
+    
     """
     
     if smiles != None:
@@ -33,14 +37,15 @@ def metsim_run_cts(smiles = None, gens = 0):
     else:
         return None
     
-def metsim_cts_phaseI_out(in_smiles = None, cts_data = None, depth = 0, out_dict = None):
+def metsim_run_cts(in_smiles = None, cts_data = None, depth = 0, out_dict = None):
     """
-    Run CTS Human Phase I metabolism simulator, then recursively process the CTS output into metsim hierarchy structure.
+    Run CTS Human Phase I metabolism simulator for input SMILES and transformation depth, then recursively process the CTS output into metsim hierarchy structure.
     inputs:
-    in_smiles: input SMILES string
-    depth: Transformation depth in terms of integer number of generations (1-4)
-    cts_data: CTS output JSON dictionary
-    out_dict: MetSim output dictionary
+    smiles (str, required): input SMILES string. Default None
+    depth (int, required): Transformation depth in terms of integer number of metabolism cycles/generations (1-4). Default 3
+    cts_data (dict, optional): CTS output JSON dictionary, used for recursion
+    outputs:
+    out_dict: MetSim hierarchically structured output dictionary
     """
     
     #generate initial output dictionary hierarchy, and obtain CTS JSON output from API:
@@ -65,7 +70,7 @@ def metsim_cts_phaseI_out(in_smiles = None, cts_data = None, depth = 0, out_dict
     
     #if no CTS output data exists, query the API
     if cts_data == None:            
-        cts_data = metsim_run_cts(smiles = in_smiles, gens = depth)
+        cts_data = metsim_cts_query(smiles = in_smiles, gens = depth)
         
         #if the API call fails and yields no output
         if cts_data == None or 'error' in list(cts_data.keys()):
@@ -137,7 +142,7 @@ def metsim_cts_phaseI_out(in_smiles = None, cts_data = None, depth = 0, out_dict
             for i in range(len(cts_data['children'])):
                 if len(cts_data['children'][i]['children']) > 0:
                     print('children found in next generational level, recursing...')
-                    out_dict = metsim_cts_phaseI_out(in_smiles = None, cts_data = cts_data['children'][i], depth = depth, out_dict = out_dict)
+                    out_dict = metsim_run_cts(in_smiles = None, cts_data = cts_data['children'][i], depth = depth, out_dict = out_dict)
             return out_dict
         else:
             #no children returned, but successful API call:
@@ -176,4 +181,4 @@ def metsim_cts_phaseI_out(in_smiles = None, cts_data = None, depth = 0, out_dict
             return out_dict
     elif 'children' not in list(cts_data.keys()):
         cts_data = cts_data['data']
-        return metsim_cts_phaseI_out(in_smiles = None, cts_data = cts_data, depth = depth, out_dict = out_dict)
+        return metsim_run_cts(in_smiles = None, cts_data = cts_data, depth = depth, out_dict = out_dict)

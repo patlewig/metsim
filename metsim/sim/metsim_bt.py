@@ -11,7 +11,7 @@ import datetime
 #import multiprocess as mp
 from itertools import compress
 import pprint
-from metsim.utl.hcd import metsim_hcd_out
+from metsim.utl.hcd import metsim_hcd_out, metsim_metadata_full
 
 
 
@@ -97,6 +97,22 @@ def recursive_gen_list(input_df = None,
                        successor_list = None,
                        out_list = [],
                        gen = 1):
+    
+    """
+    Takes input dataframe derived from BioTransformer output CSV file for a given parent chemical, and recursively searches through the output Metabolite IDs 
+    and Precursor IDs in the dataframe to correlate precursor-metabolite relationships across metabolic generations. Outputs a list of generationally-tracked 
+    metabolites from the parent chemical and its precursors.
+    
+    inputs:
+    input_df (dataframe, required): input dataframe derived from pandas read_csv of filename output from BioTransformer (btrans_metsim_subprocess output tuple, index 2 is CSV output filename)
+    successor_list (list, optional): Metabolite ID column values from the parent BioTransformer output CSV
+    parent_list (list, optional): Empty by default, previous generation's successor_list becomes the parent_list in later recursions until recursion is complete (i.e., empty successor_list)
+    output:
+    out_list (list): list of precursor-successor relationships for the parent chemical of interest in metsim hierarchical format.
+    """
+    
+    
+    
     if type(input_df) == 'NoneType':
         raise('Please include BioTransformer output csv dataframe as input_df.')
     successor_dict = {}
@@ -153,9 +169,10 @@ def recursive_gen_list(input_df = None,
 
 
 # Function 3: BioTransformer 3.0 Human Phase I + Phase II Metsim.
-def btrans_metsim_subprocess(models = ['cyp450','phaseII'],
+def btrans_metsim_subprocess(btrans_dir = '/home/jovyan/mybio',
+                             models = ['ecbased','cyp450','phaseII'],
                              cyp_mode = 1,
-                             cycles = [2,1],
+                             cycles = [1,2,1],
                              smiles = None,
                              casrn = None,
                              del_tmp = False,
@@ -166,9 +183,24 @@ def btrans_metsim_subprocess(models = ['cyp450','phaseII'],
     
     '''
     
-    input: SMILES, List of Models, List of Cycles, Delete Tempfile (True/False)
-action: Simulates human metabolism (Default: 2 cycles Phase I/"cyp450", 1 cycle Phase II/"phaseII") using BioTransformer 3.0 through Java in the command prompt, producing output data in temporary files that can be kept or deleted. Recursively searches through output CSV to process data into a standardized dictionary output.
-output: Tuple with dummy index (for parallel processing), Dictionary of precursor and successor SMILES, CASRN, DTXSID, InChIKey as supplemented by HCD (or RDKit for InChIKey), and filename (if del_tmp = False).
+    Simulates human metabolism using BioTransformer via "subprocess" package virtual command line interface and Java command line inputs. Produces CSV output files in a ".\\tmpfiles" folder 
+    Default settings are those from the 2024 MetSim manuscript (4 generations, 1 cycle Enzyme-Commission Based mixed Phase I & Phase II/"ecbased" + 2 cycles Phase I/"cyp450" + 1 cycle of Phase II/"phaseII" models, respectively).
+    
+    input:
+    btrans_dir (str, required): file path leading to the BioTransformer3.0Jar directory. Default is C:\BioTransformer3.0Jar
+    models (list of str, optional): List of models in the sequence they will be run. Default is ['ecbased','cyp450','phaseII']
+    cyp_mode (int, optional): "Cyp450" model execution mode. 1 uses CypReact as default engine (default), 2 uses CyProduct engine (prone to crashes as of June 2022), 3 is combined engine (CypReact+CyProduct engines)
+    cycles (list of int, optional) List of integer number of metabolism cycles each model will execute in the order they are defined in "models" parameter. Default is [1,2,1] to indicate 1 cycle of "ecbased", 2 cycles of "cyp450", and 1 cycle of "phaseII"
+    smiles (str, required): SMILES string corresponding to parent chemical. Default None
+    casrn (str, optional): Chemical Abstracts Services Registry Number (CASRN), if known. Default None
+    del_tmp (True/False, optional): Delete Tempfiles to free up storage after they are processed through recursive_gen_list. Default False
+    dtxsid (str, optional): EPA Distributed Structure Searchable Toxicity Database (DSSTox) Substance Identifier (DSTXSID) for parent chemical, if known. Default None 
+    chem_name (str, optional): Preferred chemical name of parent, if known. Default None
+    idx (int, optional): Dummy index (default None). Only needed if feeding this function into a "multiprocess" function call to parallel process multiple parent chemicals with metsim_bt
+    multi_proc (True/False, optional): If using multiprocessing to ensure that "idx" parameter gets stored in output tuple. Default False
+    
+    Output: 
+    Tuple with dummy index (for parallel processing), Dictionary of precursor and successor SMILES, CASRN, DTXSID, InChIKey as supplemented by HCD (or RDKit for InChIKey), and filename (if del_tmp = False).
 
     '''
     
@@ -193,14 +225,17 @@ output: Tuple with dummy index (for parallel processing), Dictionary of precurso
                            } 
     
     #change directory to BioTransformer directory
-    btrans_dir = 'C:/Users/lgroff/OneDrive - Environmental Protection Agency (EPA)/Profile/Documents/Data/GenRA/BioTransformer3.0'
-    # btrans_dir = 'C:/Users/lgroff/OneDrive - Environmental Protection Agency (EPA)/Profile/Documents/Data/GenRA/BioTransformer1.1.5'
     if os.curdir != btrans_dir:
         os.chdir(btrans_dir)
+    
+   #Ensure appropriate output CSV file folder exists for temporary files:
+    tmp_filepath ='/home/jovyan/work/bt_tmpfiles'
+    if not os.path.exists(tmp_filepath):
+        os.makedirs(tmp_filepath)
        
     if pd.notna(smiles): #check that we have a SMILES string input
         #Begin constructing BioTransformer input command string:
-        btrans_cmd = 'java -jar BioTransformer3.0_20220615.jar -k pred ' #current version
+        btrans_cmd = 'java -jar BioTransformer3.0.jar -k pred ' #current version
         # btrans_cmd = 'java -jar BioTransformer-1.1.5.jar -k pred ' #2019 paper version
         # btrans_cmd = 'java -jar BioTransformer-1-0-6.jar -k pred ' #original version (Only uses single models!)
         #incorporate model parameters into command string:
@@ -217,16 +252,27 @@ output: Tuple with dummy index (for parallel processing), Dictionary of precurso
                     btrans_model = btrans_model+models[i]+':'+str(cycles[i])+'" '
         btrans_cmd = btrans_cmd+btrans_model+' -cm '+str(cyp_mode)+' ' #specify cyp_mode with later versions of BioTransformer
         # btrans_cmd = btrans_cmd+btrans_model+' ' #no cyp_mode in input command for original 2019 relase of BioTransformer
-        
         #create temporary file to store BioTransformer output:
-        print('Generating output tempfile for index '+str(idx)+', DTXSID: '+str(dtxsid)+'...')
-        fnum, fnam = tempfile.mkstemp(dir = './tmpfiles',
-                                      prefix = 'btrans_out_'+dtxsid+'_',
-                                      suffix = '.csv')
+        if dtxsid != None:
+            print('Generating output tempfile for index '+str(idx)+', DTXSID: '+str(dtxsid)+'...')
+            fnum, fnam = tempfile.mkstemp(dir = '/home/jovyan/work/bt_tmpfiles',
+                                          prefix = 'btrans_out_'+dtxsid+'_',
+                                          suffix = '.csv')
+        else:
+            try:
+                print('Generating output tempfile for index '+str(idx)+', InChIKey: '+Chem.inchi.MolToInchiKey(Chem.MolFromSmiles(smiles))+'...')
+                fnum, fnam = tempfile.mkstemp(dir = '/home/jovyan/work/bt_tmpfiles',
+                                              prefix = 'btrans_out_'+Chem.inchi.MolToInchiKey(Chem.MolFromSmiles(smiles))+'_',
+                                              suffix = '.csv')
+            except:
+                print('Generating output tempfile for index '+str(idx)+', SMILES: '+smiles+'...')
+                fnum, fnam = tempfile.mkstemp(dir = '/home/jovyan/work/bt_tmpfiles',
+                                          prefix = 'btrans_out_',
+                                          suffix = '.csv')
         
         #Finish constructing input command using the tempfile name:
-        fnam_split = fnam.split('\\')
-        btrans_fnam = '.\\'+fnam_split[-2]+'\\'+fnam_split[-1]
+        fnam_split = fnam.split('/')
+        btrans_fnam = tmp_filepath + '/' +fnam_split[-1]
         #insert input smiles string and output csv tempfile name:
         btrans_cmd = btrans_cmd + '-ismi "'+smiles+'" -ocsv "'+btrans_fnam+'"' #use Daylight SMILES input
         # btrans_cmd = btrans_cmd + '-isdf "'+smiles+'" -ocsv "'+btrans_fnam+'"'
