@@ -10,7 +10,7 @@ setup(
         name="metsim", 
         version=VERSION,
         author="Grace Patlewicz",
-        author_email="<pythonista@shamogra.com>",
+        author_email="<patlewicz.grace@epa.gov>",
         description=DESCRIPTION,
         long_description=LONG_DESCRIPTION,
         packages=find_packages(),
