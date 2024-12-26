@@ -1,0 +1,12 @@
+site_name: metsim
+
+plugins:
+   - mkdocstrings
+nav:
+   - Home: index.md
+   - Simulation (sim): sim.md
+   - Utilities: utl.md
+  
+site_author: patlewig
+# 
+theme: readthedocs

@@ -5,14 +5,13 @@ def metsim_aggregate_results(metsim_list = None, metsim_aggregate_out = None):
     Function to aggregate two or more MetSim hierarchies together into one aggregate hierarchy that specifies how many models predicted each metabolite,
     and which models predicted each metabolite.
     
-    input:
-    
-    metsim_list (required): processed MetSim hierarchy. Must contain at least SMILES and inchikey metadata. 
-                            *note: If unprocessed predictions from a tool get inserted, will raise errors. To process data, 
-                            use metsim_metadata_full with your unprocessed predictions to generate the proper input for metsim_list.
-    
-    metsim_aggregate_out (optional): If an aggregate set of predictions already exists, and adding another metsim_list to it is desired, 
-                                     input the existing processed aggregate hierarchy of predictions.
+    Args:
+        metsim_list (required): processed MetSim hierarchy. Must contain at least SMILES and inchikey metadata. 
+                                *note: If unprocessed predictions from a tool get inserted, will raise errors. To process data, 
+                                use metsim_metadata_full with your unprocessed predictions to generate the proper input for metsim_list.
+
+        metsim_aggregate_out (optional): If an aggregate set of predictions already exists, and adding another metsim_list to it is desired, 
+                                         input the existing processed aggregate hierarchy of predictions.
     """
     if metsim_list != None:
         

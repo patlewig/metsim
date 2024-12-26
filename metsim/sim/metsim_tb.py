@@ -26,20 +26,20 @@ def metsim_run_toolbox_api(host_name = None, tb_port = None,
 	Runs a metabolism simulator of choice via an existing running instance of the OECD QSAR Toolbox Server Web API. 
 	Returns the hierarchically structured MetSim dictionary output of predicted metabolites.
 	    
-	inputs:
-	host_name (str, required): "localhost" if running a local instance of the toolbox server.
-	tb_port (int, required): integer corresponding to the port number that was set when the toolbox server was started up (e.g., 9999).
-	simulator_num (int, required): integer between 0-16 corresponding to the index of the simulator GUID list that dictates which metabolism simulator to use.
-		                           use 8 for In Vivo Rat Simulator or 15 for In Vitro Rat Liver S9. All other models are given in the Swagger UI for the API at 
-		                           http://localhost:tb_port/Swagger
-	smiles (str, required): SMILES for the parent chemical of interest
-	casrn (str, optional): Chemical Abstract Services Registry Number (CASRN) for the parent chemical of interest
-	dtxsid (str, optional): Distributed Structure Searchable Toxicity (DSSTox) Database Identifier (DTXSID) for the parent chemical of interest
-	chem_name (str, optional): Preferred chemical name for the parent chemical of interest
-	idx (int, optional): Dummy index for use with "multiprocess" when parallel processing this function.
-	    
-	output:
-	tuple of (idx, oecd_dict), where oecd_dict is a dictionary of hierarchically structured, metsim predicted precursor-successor relationships for the parent input chemical 
+	Args:
+        host_name (str, required): "localhost" if running a local instance of the toolbox server.
+        tb_port (int, required): integer corresponding to the port number that was set when the toolbox server was started up (e.g., 9999).
+        simulator_num (int, required): integer between 0-16 corresponding to the index of the simulator GUID list that dictates which metabolism simulator to use.
+                                       use 8 for In Vivo Rat Simulator or 15 for In Vitro Rat Liver S9. All other models are given in the Swagger UI for the API at 
+                                       http://localhost:tb_port/Swagger
+        smiles (str, required) : SMILES for the parent chemical of interest
+        casrn (str, optional): Chemical Abstract Services Registry Number (CASRN) for the parent chemical of interest
+        dtxsid (str, optional): Distributed Structure Searchable Toxicity (DSSTox) Database Identifier (DTXSID) for the parent chemical of interest
+        chem_name (str, optional): Preferred chemical name for the parent chemical of interest
+        idx (int, optional) : Dummy index for use with "multiprocess" when parallel processing this function.
+
+	Returns:
+        : tuple of (idx, oecd_dict), where oecd_dict is a dictionary of hierarchically structured, metsim predicted precursor-successor relationships for the parent input chemical 
 	    
 	"""
    
@@ -144,13 +144,13 @@ def metsim_tb_search_logkow(casrn = None, host_name = None, tb_port = None, idx 
     Search the OECD Toolbox database via its WebAPI for a chemical ID for an input chemical, and then 
     return the octanol-water partition coefficient to have a measure of its hydrophobicity.
     
-    Inputs: 
-    casrn: CAS Registry Number
-    tb_port: Port number selected for locally running instance of the Toolbox Server
-    host_name: ip address for the server runnning the Toolbox
+    Args: 
+        casrn: CAS Registry Number
+        tb_port: Port number selected for locally running instance of the Toolbox Server
+        host_name: ip address for the server runnning the Toolbox
     
-    Outputs:
-    log_kow: Log10 scaled octanol-water partition coefficient, if available.
+    Returns:
+        log_kow: Log10 scaled octanol-water partition coefficient, if available.
     """
    
     
@@ -225,21 +225,21 @@ def metsim_search_toolbox_api(tb_port = 16384,
     
     Run serially to circumvent toolbox search server crash issues until rectified by LMC service pack updates.
     
-    inputs:
-    host_name (str, required): "localhost" if running a local instance of the toolbox server.
-    tb_port (int, required): integer corresponding to the port number that was set when the toolbox server was started up (e.g., 9999).
-    simulator_num (int, required): integer between 0-16 corresponding to the index of the simulator GUID list that dictates which metabolism simulator to use.
-                                   use 8 for In Vivo Rat Simulator or 15 for In Vitro Rat Liver S9. All other models are given in the Swagger UI for the API at 
-                                   http://localhost:tb_port/Swagger
-    smiles (str, required): SMILES for the parent chemical of interest
-    casrn (str, optional): Chemical Abstract Services Registry Number (CASRN) for the parent chemical of interest
-    dtxsid (str, optional): Distributed Structure Searchable Toxicity (DSSTox) Database Identifier (DTXSID) for the parent chemical of interest
-    chem_name (str, optional): Preferred chemical name for the parent chemical of interest
-    idx (int, optional): Dummy index for use with "multiprocess" when parallel processing this function.
+    Args:
+        host_name (str, required): "localhost" if running a local instance of the toolbox server.
+        tb_port (int, required): integer corresponding to the port number that was set when the toolbox server was started up (e.g., 9999).
+        simulator_num (int, required): integer between 0-16 corresponding to the index of the simulator GUID list that dictates which metabolism simulator to use.
+                                       use 8 for In Vivo Rat Simulator or 15 for In Vitro Rat Liver S9. All other models are given in the Swagger UI for the API at 
+                                       http://localhost:tb_port/Swagger
+        smiles (str, required): SMILES for the parent chemical of interest
+        casrn (str, optional): Chemical Abstract Services Registry Number (CASRN) for the parent chemical of interest
+        dtxsid (str, optional): Distributed Structure Searchable Toxicity (DSSTox) Database Identifier (DTXSID) for the parent chemical of interest
+        chem_name (str, optional): Preferred chemical name for the parent chemical of interest
+        idx (int, optional): Dummy index for use with "multiprocess" when parallel processing this function.
     
-    output:
-    tuple of (idx, oecd_dict), where oecd_dict is a dictionary of hierarchically structured, metsim predicted precursor-successor relationships for the parent input chemical 
-    
+    Returns:
+        tuple of (idx, oecd_dict), where oecd_dict is a dictionary of hierarchically structured, metsim predicted precursor-successor relationships for the parent input chemical 
+
     """
     
     

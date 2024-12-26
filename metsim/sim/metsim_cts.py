@@ -12,10 +12,10 @@ def metsim_cts_query(smiles = None, gens = 0):
     """
     Helper function to query the REST API for EPA CTS ChemAxon Human Phase I metabolic simulator.
     
-    Input:
-    smiles (str, required): parent/precursor SMILES string that will serve as the value for the "structure" key in the POST JSON for the API request.
-    gens (int, required): An integer value for number of metabolism cycles/generations (0-4)
-    
+    Args:
+        smiles (str, required): parent/precursor SMILES string that will serve as the value for the "structure" key in the POST JSON for the API request.
+        gens (int, required): An integer value for number of metabolism cycles/generations (0-4)
+
     """
     
     if smiles != None:
@@ -40,12 +40,15 @@ def metsim_cts_query(smiles = None, gens = 0):
 def metsim_run_cts(in_smiles = None, cts_data = None, depth = 0, out_dict = None):
     """
     Run CTS Human Phase I metabolism simulator for input SMILES and transformation depth, then recursively process the CTS output into metsim hierarchy structure.
-    inputs:
-    smiles (str, required): input SMILES string. Default None
-    depth (int, required): Transformation depth in terms of integer number of metabolism cycles/generations (1-4). Default 3
-    cts_data (dict, optional): CTS output JSON dictionary, used for recursion
-    outputs:
-    out_dict: MetSim hierarchically structured output dictionary
+    
+    Args:
+        smiles (str, required): input SMILES string. Default None
+        depth (int, required): Transformation depth in terms of integer number of metabolism cycles/generations (1-4). Default 3
+        cts_data (dict, optional): CTS output JSON dictionary, used for recursion
+        
+    Returns:
+        out_dict: MetSim hierarchically structured output dictionary
+        
     """
     
     #generate initial output dictionary hierarchy, and obtain CTS JSON output from API:

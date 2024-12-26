@@ -103,12 +103,14 @@ def recursive_gen_list(input_df = None,
     and Precursor IDs in the dataframe to correlate precursor-metabolite relationships across metabolic generations. Outputs a list of generationally-tracked 
     metabolites from the parent chemical and its precursors.
     
-    inputs:
-    input_df (dataframe, required): input dataframe derived from pandas read_csv of filename output from BioTransformer (btrans_metsim_subprocess output tuple, index 2 is CSV output filename)
-    successor_list (list, optional): Metabolite ID column values from the parent BioTransformer output CSV
-    parent_list (list, optional): Empty by default, previous generation's successor_list becomes the parent_list in later recursions until recursion is complete (i.e., empty successor_list)
-    output:
-    out_list (list): list of precursor-successor relationships for the parent chemical of interest in metsim hierarchical format.
+    Args:
+        input_df: input dataframe (dataframe, required) derived from pandas read_csv of filename output from BioTransformer (btrans_metsim_subprocess output tuple, index 2 is CSV output filename)
+        successor_list: Metabolite ID column values from the parent BioTransformer output CSV (list, optional)
+        parent_list: Empty by default, previous generation's successor_list becomes the parent_list in later recursions until recursion is complete (i.e., empty successor_list) (list, optional)
+        
+    Returns:
+        out_list: list of precursor-successor relationships for the parent chemical of interest in metsim hierarchical format.
+        
     """
     
     
@@ -186,21 +188,21 @@ def btrans_metsim_subprocess(btrans_dir = '/home/jovyan/mybio',
     Simulates human metabolism using BioTransformer via "subprocess" package virtual command line interface and Java command line inputs. Produces CSV output files in a ".\\tmpfiles" folder 
     Default settings are those from the 2024 MetSim manuscript (4 generations, 1 cycle Enzyme-Commission Based mixed Phase I & Phase II/"ecbased" + 2 cycles Phase I/"cyp450" + 1 cycle of Phase II/"phaseII" models, respectively).
     
-    input:
-    btrans_dir (str, required): file path leading to the BioTransformer3.0Jar directory. Default is C:\BioTransformer3.0Jar
-    models (list of str, optional): List of models in the sequence they will be run. Default is ['ecbased','cyp450','phaseII']
-    cyp_mode (int, optional): "Cyp450" model execution mode. 1 uses CypReact as default engine (default), 2 uses CyProduct engine (prone to crashes as of June 2022), 3 is combined engine (CypReact+CyProduct engines)
-    cycles (list of int, optional) List of integer number of metabolism cycles each model will execute in the order they are defined in "models" parameter. Default is [1,2,1] to indicate 1 cycle of "ecbased", 2 cycles of "cyp450", and 1 cycle of "phaseII"
-    smiles (str, required): SMILES string corresponding to parent chemical. Default None
-    casrn (str, optional): Chemical Abstracts Services Registry Number (CASRN), if known. Default None
-    del_tmp (True/False, optional): Delete Tempfiles to free up storage after they are processed through recursive_gen_list. Default False
-    dtxsid (str, optional): EPA Distributed Structure Searchable Toxicity Database (DSSTox) Substance Identifier (DSTXSID) for parent chemical, if known. Default None 
-    chem_name (str, optional): Preferred chemical name of parent, if known. Default None
-    idx (int, optional): Dummy index (default None). Only needed if feeding this function into a "multiprocess" function call to parallel process multiple parent chemicals with metsim_bt
-    multi_proc (True/False, optional): If using multiprocessing to ensure that "idx" parameter gets stored in output tuple. Default False
-    
-    Output: 
-    Tuple with dummy index (for parallel processing), Dictionary of precursor and successor SMILES, CASRN, DTXSID, InChIKey as supplemented by HCD (or RDKit for InChIKey), and filename (if del_tmp = False).
+    Args:
+        btrans_dir (str, required): file path leading to the BioTransformer3.0Jar directory. Default is C:\BioTransformer3.0Jar
+        models (list of str, optional): List of models in the sequence they will be run. Default is ['ecbased','cyp450','phaseII']
+        cyp_mode (int, optional): "Cyp450" model execution mode. 1 uses CypReact as default engine (default), 2 uses CyProduct engine (prone to crashes as of June 2022), 3 is combined engine (CypReact+CyProduct engines)
+        cycles (list of int, optional) List of integer number of metabolism cycles each model will execute in the order they are defined in "models" parameter. Default is [1,2,1] to indicate 1 cycle of "ecbased", 2 cycles of "cyp450", and 1 cycle of "phaseII"
+        smiles (str, required): SMILES string corresponding to parent chemical. Default None
+        casrn (str, optional): Chemical Abstracts Services Registry Number (CASRN), if known. Default None
+        del_tmp (True/False, optional): Delete Tempfiles to free up storage after they are processed through recursive_gen_list. Default False
+        dtxsid (str, optional): EPA Distributed Structure Searchable Toxicity Database (DSSTox) Substance Identifier (DSTXSID) for parent chemical, if known. Default None 
+        chem_name (str, optional): Preferred chemical name of parent, if known. Default None
+        idx (int, optional): Dummy index (default None). Only needed if feeding this function into a "multiprocess" function call to parallel process multiple parent chemicals with metsim_bt
+        multi_proc (True/False, optional): If using multiprocessing to ensure that "idx" parameter gets stored in output tuple. Default False
+
+    Returns: 
+         output: Tuple of Dummy index (for parallel processing), Dictionary of precursor and successor SMILES, CASRN, DTXSID, InChIKey as supplemented by HCD (or RDKit for InChIKey) and filename (if del_tmp = False).
 
     '''
     

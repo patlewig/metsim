@@ -15,80 +15,36 @@ def metsim_hcd_out(smiles = None,
                    dtxsid = None,
                    chem_name = None,
                    likely = None):
+    
     """
-    Query function for the Cheminformatics Modules Standardizer API, formerly wrapped within the Hazard Comparison Dashboard (HCD) API. 
-    Used to convert an input SMILES string into QSAR-Ready SMILES (hcd_smiles). Returns InChIKey structural identifier as well,
-    along with any other chemical identifer metadata if available, and not already given as inputs (e.g., CASRN, DTXSID, Chemical Name).
+        Query function for the Cheminformatics Modules Standardizer API, formerly wrapped within the Hazard Comparison Dashboard (HCD) API. 
+        Used to convert an input SMILES string into QSAR-Ready SMILES (hcd_smiles). Returns InChIKey structural identifier as well,
+        along with any other chemical identifer metadata if available, and not already given as inputs (e.g., CASRN, DTXSID, Chemical Name).
+
+        If SMILES is not known, but DTXSID is known, can instead query on DTXSID to obtain Daylight SMILES from the Comptox Chemicals Dashboard API (CCD API),
+        and subsequently query the Standardizer API using the SMILES obtained from the CCD API.
+
     
-    If SMILES is not known, but DTXSID is known, can instead query on DTXSID to obtain Daylight SMILES from the Comptox Chemicals Dashboard API (CCD API),
-    and subsequently query the Standardizer API using the SMILES obtained from the CCD API.
-    
-    Required Inputs:
-    smiles: Daylight SMILES string
-    or
-    dtxsid: DSSTox Substance Identifier
-    
-    Optional Inputs:
-    chem_name: Chemical name, whether trade name or IUPAC
-    casrn: Chemical Abstracts Services Registry Number
-    inchikey: International Chemical Identifier Key (InChIKey)
-    likely: If MetSim predictions are obtained from the Chemical Transformation Simulator, can optionally keep the transformation "likelihood" parameter
-    
-    Returns:
-    out_dict: Output dictionary containing all available output data for the given chemical, using the input parameter names as dictionary keys.
-    Includes "hcd" as output dictionary key containing QSAR-Ready version of the input SMILES.
-    
-    Examples:
-    
-    SMILES given as sole input:
-    input:    
-    test_dict = metsim_hcd_out(smiles = "OCCOCCO")
-    
-    output:
-    Attempting query of Cheminformatics Modules Standardizer with SMILES: OCCOCCO...
-    Query succeeded.
-    test_dict
-    {'smiles': 'OCCOCCO',
-     'casrn': '111-46-6',
-     'hcd_smiles': 'OCCOCCO',
-     'inchikey': 'MTHSVFCYNBDYFN-UHFFFAOYNA-N',
-     'dtxsid': 'DTXSID8020462',
-     'chem_name': 'Diethylene glycol',
-     'likelihood': None}
-    
-    DTXSID given as sole input:
-    
-    input:    
-    test_dict = metsim_hcd_out(dtxsid = "DTXSID4020402")
-    
-    output:
-    Attempting query of Comptox Chemicals Dashboard with DTXSID: DTXSID4020402...
-    Query succeeded.
-    No SMILES given. Using CCD output SMILES.
-    Attempting query of Cheminformatics Modules Standardizer with SMILES: CC1=C(N)C=C(N)C=C1...
-    Query succeeded.
-    test_dict
-    {'smiles': 'CC1=C(N)C=C(N)C=C1',
-     'casrn': '95-80-7',
-     'hcd_smiles': 'CC1C=CC(N)=CC=1N',
-     'inchikey': 'VOZKAJLKRJDJLL-UHFFFAOYNA-N',
-     'dtxsid': 'DTXSID4020402',
-     'chem_name': '2,4-Diaminotoluene',
-     'likelihood': None}
-     
-     Empty inputs:
-     input:
-     test_dict = metsim_hcd_out(smiles = None, dtxsid = None)
-     
-     output:
-     test_dict
-     {'smiles': None,
-      'casrn': None,
-      'hcd_smiles': None,
-      'inchikey': None,
-      'dtxsid': None,
-      'chem_name': None,
-      'likelihood': None}   
+        Examples:
+                >>> metsim_hcd_out(smiles = "OCCOCCO") 
+                {'smiles': 'OCCOCCO','casrn': '111-46-6', 'hcd_smiles': 'OCCOCCO',  'inchikey': 'MTHSVFCYNBDYFN-UHFFFAOYNA-N','dtxsid': 'DTXSID8020462','chem_name': 'Diethylene glycol','likelihood': None}
+                >>> metsim_hcd_out(dtxsid = "DTXSID4020402")
+                {'smiles': 'CC1=C(N)C=C(N)C=C1', 'casrn': '95-80-7','hcd_smiles': 'CC1C=CC(N)=CC=1N','inchikey': 'VOZKAJLKRJDJLL-UHFFFAOYNA-N','dtxsid': 'DTXSID4020402', 'chem_name': '2,4-Diaminotoluene', 'likelihood': None}
+                >>> metsim_hcd_out(smiles = None, dtxsid = None)
+                {'smiles': None, 'casrn': None, 'hcd_smiles': None,'inchikey': None, 'dtxsid': None, 'chem_name': None, 'likelihood': None}   
+
+       Args:
+            smiles: Daylight SMILES string 
+            dtxsid: DSSTox Substance Identifier
+            chem_name: Chemical name, whether trade name or IUPAC (optional)
+            casrn: Chemical Abstracts Services Registry Number (optional)
+            inchikey: International Chemical Identifier Key (InChIKey) (optional)
+            likely: If MetSim predictions are obtained from the Chemical Transformation Simulator, can optionally keep the transformation "likelihood" parameter (optional)
+
+        Returns:
+            out_dict: Output dictionary containing all available output data for the given chemical, using the input parameter names as dictionary keys. Includes "hcd" as output dictionary key containing QSAR-Ready version of the input SMILES.
+
+          
     """
     
     ccd_out = []
@@ -218,11 +174,11 @@ def metsim_metadata_full(metsim_out = [], fnam = None, metsim_cache = None):
     
     incorporates temporary caching of the metsim_hcd_out queries to avoid repepetive queries for commonly reoccuring metabolites to save time.
     
-    Input:
-    
-    metsim_out (list): list of MetSim hierarchically structured dictionary outputs for each input chemical in the dataset.
-    fnam (str, optional): the filename you would like to save the output to, ending in .json (e.g., "my_output_data.json"), will save to current working directory if not otherwise specified in fnam.
-    metsim_cache (list, optional): list of cached metsim_hcd_out queries.
+    Args:
+        metsim_out (list): list of MetSim hierarchically structured dictionary outputs for each input chemical in the dataset.
+        fnam (str, optional): the filename you would like to save the output to, ending in .json (e.g., "my_output_data.json"), will save to current working directory if not otherwise specified in fnam.
+        metsim_cache (list, optional): list of cached metsim_hcd_out queries.
+        
     """
     if len(metsim_out) > 0:
         if type(metsim_out) == dict:
